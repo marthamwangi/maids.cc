@@ -4,7 +4,8 @@ export const APP_ROUTES: Route[] = [
   {
     path: '',
     pathMatch: 'full',
-    loadComponent: () => import('../app.component').then((c) => c.AppComponent),
+    loadComponent: () =>
+      import('../components/landing/app.component').then((c) => c.AppComponent),
   },
   {
     path: ':id',
