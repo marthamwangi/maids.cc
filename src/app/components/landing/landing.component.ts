@@ -9,17 +9,22 @@ import {
 } from '@angular/core';
 import { initFlowbite } from 'flowbite';
 import { NavbarComponent } from '../navbar/navbar.component';
-import { CrudService } from 'src/app/service/crud.service';
 import { AsyncPipe, NgFor, NgIf, NgTemplateOutlet } from '@angular/common';
-import { IUserModel, viewType } from 'src/app/model/user.model';
+
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import {
   BehaviorSubject,
+  Observable,
   Subject,
   distinctUntilChanged,
   takeUntil,
 } from 'rxjs';
 import { RouterLink, RouterOutlet } from '@angular/router';
+import { Store } from '@ngrx/store';
+import * as UserSelectors from '../../state-manager/state/selectors';
+import * as UserActions from '../../state-manager/state/actions';
+import { IUserModel, viewType } from 'src/app/state-manager/model/user.model';
+import { AppState } from 'src/app/state-manager/state/store';
 
 @Component({
   selector: 'landing-page',
@@ -40,7 +45,8 @@ import { RouterLink, RouterOutlet } from '@angular/router';
 })
 export class LandingPage implements OnInit {
   private _changeDetectorRef: ChangeDetectorRef = inject(ChangeDetectorRef);
-  private _crudService: CrudService = inject(CrudService);
+  private _store: Store<AppState> = inject(Store);
+
   private unsubscribe$: Subject<boolean> = new Subject<boolean>();
 
   @ViewChild('skeletonRef', { static: true })
@@ -52,19 +58,49 @@ export class LandingPage implements OnInit {
 
   public renderedView: viewType = 'noContent';
 
-  public _users: Array<IUserModel> = [];
+  private _users$: Observable<Array<IUserModel>> = this._store.select(
+    UserSelectors.usersListSelector
+  );
+
+  private _users: Array<IUserModel> = [];
+
   public renderedUsers$: BehaviorSubject<Array<IUserModel>> =
     new BehaviorSubject<Array<IUserModel>>([]);
+
   public pages: number = 0;
-  public totalPages: number = 0;
-  public totalUSers: number = 0;
-  public perPage: number = 0;
+
+  private _totalPages$: Observable<number> = this._store.select(
+    UserSelectors.totalPagesSelector
+  );
+
+  private _totalUSers$: Observable<number> = this._store.select(
+    UserSelectors.totalUsersSelector
+  );
+  private _perPage$: Observable<number> = this._store.select(
+    UserSelectors.perPageSelector
+  );
+
+  public totalPages!: number;
+  public totalUsers!: number;
+  public perPage!: number;
+
+  constructor() {
+    this._totalPages$.subscribe((value) => {
+      this.totalPages = value;
+    });
+    this._totalUSers$.subscribe((value) => {
+      this.totalUsers = value;
+    });
+    this._perPage$.subscribe((value) => {
+      this.perPage = value;
+    });
+  }
+
   public readonly indexOffset: number = 1;
   public start: number = 0;
   public end: number = 0;
 
   public currentPage = 1;
-  private _params = { page: 1 };
   public search: string = '';
   public pagesList: Array<number> = [];
 
@@ -74,7 +110,7 @@ export class LandingPage implements OnInit {
 
   ngOnInit(): void {
     initFlowbite();
-    this.getUsers();
+    this._getUsers();
     this.searchForUser();
   }
 
@@ -91,16 +127,22 @@ export class LandingPage implements OnInit {
     return templateMap[this.renderedView];
   }
 
-  public getUsers(): void {
-    this._params.page = this.currentPage;
-    this._crudService.getAllUsers(this._params).subscribe({
+  public _getUsers(): void {
+    this._store.dispatch(
+      UserActions.getPageUsersFromBackend({ page: this.currentPage })
+    );
+    this.renderedView = 'skeleton';
+    setTimeout(() => {
+      this._renderUsers();
+    }, 50);
+  }
+
+  private _renderUsers() {
+    this._users$.subscribe({
       next: (res) => {
-        this._users = res.response.users;
-        this.renderedUsers$.next(this._users);
-        this.totalUSers = res.response.totalUsers;
-        this.perPage = res.response.perPage;
-        this.totalPages = res.response.totalPages;
-        if (this._users.length) {
+        if (res?.length) {
+          this._users = res;
+          this.renderedUsers$.next(res);
           this.renderedView = 'content';
         } else {
           this.renderedView = 'noContent';
@@ -113,7 +155,6 @@ export class LandingPage implements OnInit {
         console.log(error);
       },
     });
-    this.renderedView = 'skeleton';
   }
 
   private _createPagesList(): void {
@@ -131,8 +172,8 @@ export class LandingPage implements OnInit {
     /**
      * decide on the end
      */
-    if (this.start + this.perPage >= this.totalUSers) {
-      this.end = this.totalUSers;
+    if (this.start + this.perPage >= this.totalUsers) {
+      this.end = this.totalUsers;
     } else {
       this.end = this.start - this.indexOffset + this.perPage;
     }
@@ -143,7 +184,8 @@ export class LandingPage implements OnInit {
       return;
     }
     this.currentPage += 1;
-    this.getUsers();
+    console.log('current', this.currentPage);
+    this._getUsers();
   }
 
   public goToPreviousPage() {
@@ -151,7 +193,7 @@ export class LandingPage implements OnInit {
       return;
     }
     this.currentPage -= 1;
-    this.getUsers();
+    this._getUsers();
   }
 
   public showSetPagesCap(cap: number): void {
@@ -163,7 +205,7 @@ export class LandingPage implements OnInit {
       return;
     }
     this.currentPage = page;
-    this.getUsers();
+    this._getUsers();
   }
 
   public searchForUser() {
