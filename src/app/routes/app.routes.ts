@@ -5,10 +5,12 @@ export const APP_ROUTES: Route[] = [
     path: '',
     pathMatch: 'full',
     loadComponent: () =>
-      import('../components/landing/app.component').then((c) => c.AppComponent),
+      import('../components/landing/landing.component').then(
+        (c) => c.LandingPage
+      ),
   },
   {
-    path: ':id',
+    path: 'view/:id',
     pathMatch: 'full',
     loadComponent: () =>
       import('../components/user-details/user-details.component').then(
