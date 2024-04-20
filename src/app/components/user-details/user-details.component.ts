@@ -7,12 +7,14 @@ import {
   ViewChild,
   inject,
 } from '@angular/core';
-import { CrudService } from 'src/app/service/crud.service';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { BehaviorSubject, map } from 'rxjs';
-import { IUserModel, viewType } from 'src/app/model/user.model';
+import { BehaviorSubject, Observable, map } from 'rxjs';
 import { AsyncPipe, NgStyle, NgTemplateOutlet } from '@angular/common';
-
+import { IUserModel, viewType } from 'src/app/state-manager/model/user.model';
+import { AppState } from 'src/app/state-manager/state/store';
+import { Store } from '@ngrx/store';
+import * as fromUserSelector from '../../state-manager/state/selectors';
+import * as fromUserAction from '../../state-manager/state/actions';
 @Component({
   selector: 'ud-user-details',
   standalone: true,
@@ -22,8 +24,8 @@ import { AsyncPipe, NgStyle, NgTemplateOutlet } from '@angular/common';
 })
 export class UserDetailsComponent implements OnInit {
   private _changeDetectorRef: ChangeDetectorRef = inject(ChangeDetectorRef);
-  private _crudService: CrudService = inject(CrudService);
   private _activatedRoute: ActivatedRoute = inject(ActivatedRoute);
+  private _store: Store<AppState> = inject(Store);
 
   @ViewChild('skeletonRef', { static: true })
   private skeletonRef!: TemplateRef<any>;
@@ -33,7 +35,9 @@ export class UserDetailsComponent implements OnInit {
   private noContentRef!: TemplateRef<any>;
   public renderedView: viewType = 'noContent';
 
-  private _user: IUserModel | null = null;
+  private _user$: Observable<IUserModel> = this._store.select(
+    fromUserSelector.singleUserSelector
+  );
   public renderedUser$: BehaviorSubject<IUserModel | null> =
     new BehaviorSubject<IUserModel | null>(null);
 
@@ -57,19 +61,24 @@ export class UserDetailsComponent implements OnInit {
     this._activatedRoute.params
       .pipe(map((params: any) => params.id))
       .subscribe((id) => {
-        this._crudService.getOne(id).subscribe({
-          next: (res) => {
-            this._user = res.data.user;
-            this.renderedUser$.next(this._user);
-            if (this._user) {
-              this.renderedView = 'content';
-            } else {
-              this.renderedView = 'noContent';
-            }
-          },
-        });
+        this._store.dispatch(fromUserAction.getSingleUserFromBackend({ id }));
+        this.renderedView = 'skeleton';
+        setTimeout(() => {
+          this._renderUser();
+        }, 50);
       });
-    this.renderedView = 'skeleton';
+  }
+  private _renderUser() {
+    this._user$.subscribe({
+      next: (user) => {
+        this.renderedUser$.next(user);
+        if (this.renderedUser$.value?.id !== 0) {
+          this.renderedView = 'content';
+        } else {
+          this.renderedView = 'noContent';
+        }
+      },
+    });
     this._commonChangeDetector();
   }
 }
