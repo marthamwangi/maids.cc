@@ -1,8 +1,14 @@
+export type viewType = 'skeleton' | 'content' | 'noContent';
+
 export interface IUsersResponse {
   users: Array<IUserModel>;
   totalUsers: number;
   totalPages: number;
   perPage: number;
+}
+
+export interface IUserResponse {
+  user: IUserModel;
 }
 export interface IUserModel {
   id: number;
@@ -20,7 +26,7 @@ export interface AllUsersResponse {
 }
 
 export interface UserResponse {
-  user: UserData;
+  data: UserData;
 }
 
 export interface UserData {
