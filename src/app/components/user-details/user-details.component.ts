@@ -63,14 +63,13 @@ export class UserDetailsComponent implements OnInit {
             this.renderedUser$.next(this._user);
             if (this._user) {
               this.renderedView = 'content';
-            } else if (!this._user) {
-              this.renderedView = 'noContent';
             } else {
-              this.renderedView = 'skeleton';
+              this.renderedView = 'noContent';
             }
-            this._commonChangeDetector();
           },
         });
       });
+    this.renderedView = 'skeleton';
+    this._commonChangeDetector();
   }
 }
